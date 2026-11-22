@@ -23,6 +23,28 @@ $("login-form").addEventListener("submit", async (e) => {
 $("logout-btn").addEventListener("click", () => sb.auth.signOut());
 
 // ---------- upload ----------
+// When a file is chosen, read its date setting and tick the checkbox to match (you can still change it)
+$("rev-file").addEventListener("change", async () => {
+  const file = $("rev-file").files[0];
+  if (!file) return;
+  try {
+    const wb = XLSX.read(await file.arrayBuffer(), { type: "array", bookFiles: true, cellDates: false });
+    $("date1904").checked = detect1904(wb);
+    setStatus(`Date system detected: ${$("date1904").checked ? "1904 (Mac Excel)" : "1900 (Windows Excel)"}. Check the years after upload.`);
+  } catch (err) {
+    setStatus(`Could not read file: ${err.message}`, true);
+  }
+});
+
+// Reads the workbook's date setting from its internal settings file
+function detect1904(wb) {
+  const key = Object.keys(wb.files || {}).find((k) => k.replace(/^\//, "") === "xl/workbook.xml");
+  if (!key) return false;
+  const raw = wb.files[key];
+  const text = typeof raw === "string" ? raw : new TextDecoder().decode(raw);
+  return /date1904="(1|true)"/.test(text);
+}
+
 $("import-btn").addEventListener("click", async () => {
   const file = $("rev-file").files[0];
   if (!file) return setStatus("Choose the Excel file first.", true);
@@ -30,18 +52,22 @@ $("import-btn").addEventListener("click", async () => {
   $("import-btn").disabled = true;
   try {
     setStatus("Reading file…");
-    const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+    // cellDates is off: dates are converted below, using the checkbox setting
+    const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: false });
+    const is1904 = $("date1904").checked;
     const missing = Object.keys(SHEETS).filter((n) => !wb.SheetNames.includes(n));
     if (missing.length) throw new Error(`Missing tab(s) in this file: ${missing.join(", ")}`);
 
     const counts = [];
     for (const [sheet, dataset] of Object.entries(SHEETS)) {
-      const { rows, skipped } = sheetToRows(wb.Sheets[sheet], sheet, dataset);
+      const { rows, skipped } = sheetToRows(wb.Sheets[sheet], sheet, dataset, is1904);
       setStatus(`Saving ${sheet} (${rows.length} rows)…`);
       await replaceDataset(dataset, rows);
-      counts.push(`${sheet} ${rows.length}${skipped ? ` (${skipped} rows without a date skipped)` : ""}`);
+      const years = rows.map((r) => Number(r[REVENUE_COLUMNS[dataset].date].slice(0, 4)));
+      const span = years.length ? `${Math.min(...years)}–${Math.max(...years)}` : "no dates";
+      counts.push(`${sheet} ${rows.length} rows, years ${span}${skipped ? `, ${skipped} rows without a date skipped` : ""}`);
     }
-    setStatus(`Upload done: ${counts.join(", ")}.`);
+    setStatus(`Upload done: ${counts.join("; ")}.`);
   } catch (err) {
     setStatus(`Upload failed: ${err.message}`, true);
   } finally {
@@ -50,7 +76,7 @@ $("import-btn").addEventListener("click", async () => {
 });
 
 // Finds the header row (the workbook has a total line above it in Promet MP), then keeps only the needed columns.
-function sheetToRows(ws, sheetName, dataset) {
+function sheetToRows(ws, sheetName, dataset, is1904) {
   const cols = REVENUE_COLUMNS[dataset];
   const needed = [cols.date, cols.revenue, cols.vat, cols.profit];
   const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: false });
@@ -68,10 +94,9 @@ function sheetToRows(ws, sheetName, dataset) {
   const rows = [];
   let skipped = 0;
   for (const row of aoa.slice(headerIndex + 1)) {
-    const d = row[at[cols.date]];
-    const key = d instanceof Date ? dateKey(d) : String(d ?? "");
+    const key = excelDateKey(row[at[cols.date]], is1904);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) {
-      if (d !== null && d !== undefined && d !== "") skipped++;
+      if (row[at[cols.date]] !== null && row[at[cols.date]] !== undefined && row[at[cols.date]] !== "") skipped++;
       continue;
     }
     rows.push({
@@ -99,9 +124,18 @@ async function replaceDataset(dataset, rows) {
   }
 }
 
-function dateKey(d) {
-  const p = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+// Excel stores dates as day numbers. Workbooks from Mac Excel use the 1904 system,
+// which is 1462 days behind the usual 1900 system, so the offset is added before converting.
+// Returns "yyyy-mm-dd", or "" when the cell is not a date.
+function excelDateKey(v, is1904) {
+  const pad = (n) => String(n).padStart(2, "0");
+  if (typeof v === "number") {
+    const dc = XLSX.SSF.parse_date_code(v + (is1904 ? 1462 : 0));
+    if (!dc) return "";
+    return `${dc.y}-${pad(dc.m)}-${pad(dc.d)}`;
+  }
+  if (v instanceof Date) return `${v.getFullYear()}-${pad(v.getMonth() + 1)}-${pad(v.getDate())}`;
+  return String(v ?? "");
 }
 
 function setStatus(msg, isError = false) {

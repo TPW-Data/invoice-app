@@ -75,6 +75,10 @@
       <label>Excel file (.xlsx)
         <input type="file" id="rev-file" accept=".xlsx">
       </label>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px">
+        <input type="checkbox" id="date1904" style="width:auto;margin:0">
+        Dates use the 1904 system (Mac Excel). Ticked automatically when the file is chosen.
+      </label>
       <button class="btn" id="import-btn" type="button">Upload</button>
       <p id="status" role="status"></p>
     </div>
