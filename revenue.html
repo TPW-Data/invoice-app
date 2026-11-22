@@ -13,15 +13,25 @@
   <style>
     :root { font-family: system-ui, -apple-system, sans-serif; color: #111; }
     body { margin: 0; background: #f4f5f7; }
-    main { max-width: 1000px; margin: 0 auto; padding: 16px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 16px; }
     h1 { font-size: 1.3rem; margin: 8px 0 16px; }
-    h2 { font-size: 1rem; margin: 0 0 8px; }
+    h2 { font-size: .95rem; margin: 0 0 10px; color: #333; }
     .card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
     .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     label { display: block; font-size: .85rem; color: #444; margin-top: 0; }
-    select, input { width: 100%; box-sizing: border-box; font-size: 16px; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-top: 4px; background: #fff; }
+    select { width: 100%; box-sizing: border-box; font-size: 16px; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-top: 4px; background: #fff; }
     .btn { display: block; width: 100%; text-align: center; font-size: 1.05rem; padding: 14px; border: 0; border-radius: 10px; background: #1f6feb; color: #fff; margin-top: 12px; cursor: pointer; box-sizing: border-box; }
     .btn.secondary { background: #555; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    .kpi { background: #fff; border-radius: 12px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); border-top: 4px solid #456733; }
+    .kpi.blue { border-top-color: #1f6feb; }
+    .kpi.orange { border-top-color: #f0a202; }
+    .kpi.purple { border-top-color: #8e44ad; }
+    .kpi small { color: #666; display: block; font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; }
+    .kpi strong { display: block; font-size: 1.35rem; margin: 6px 0 4px; }
+    .kpi .sub { font-size: .8rem; color: #555; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .chart-box { position: relative; height: 260px; }
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: .85rem; }
     th, td { text-align: right; padding: 6px; border-bottom: 1px solid #eee; white-space: nowrap; }
@@ -39,7 +49,8 @@
     .menu { background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.15); display: flex; flex-direction: column; }
     .menu a { padding: 16px; color: #111; text-decoration: none; border-bottom: 1px solid #eee; font-size: 1.05rem; }
     .menu a.current { font-weight: 700; color: #456733; }
-    @media (max-width: 600px) { .filters { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) { .kpis { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } .filters { grid-template-columns: 1fr; } }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -91,6 +102,43 @@
     <p class="muted" id="period"></p>
     <p id="status" role="status"></p>
 
+    <div class="kpis" id="kpis"></div>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>Monthly revenue: this year vs past year</h2>
+        <div class="chart-box"><canvas id="c-monthly"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Year to date (cumulative revenue)</h2>
+        <div class="chart-box"><canvas id="c-ytd"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>MP and VP revenue by month</h2>
+        <div class="chart-box"><canvas id="c-split"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Profit and margin % by month</h2>
+        <div class="chart-box"><canvas id="c-profit"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>VAT by month: this year vs past year</h2>
+        <div class="chart-box"><canvas id="c-vat"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>MP / VP share of revenue (selected period)</h2>
+        <div class="chart-box"><canvas id="c-share"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Average MP revenue per trading day, by weekday (selected period)</h2>
+        <div class="chart-box"><canvas id="c-week"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>All years: revenue and profit</h2>
+        <div class="chart-box"><canvas id="c-years"></canvas></div>
+      </div>
+    </div>
+
     <div id="tables"></div>
 
     <button class="btn secondary" id="logout-btn" type="button">Sign out</button>
@@ -98,6 +146,7 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="config.js"></script>
 <script src="revenue-calc.js"></script>
 <script src="revenue.js"></script>
