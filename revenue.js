@@ -108,7 +108,7 @@ function render() {
   const idx = month === null ? ALL_MONTHS : [month];
   const label = month === null ? `${year}` : `${MONTHS[month]} ${year}`;
   const pastLabel = month === null ? `${year - 1}` : `${MONTHS[month]} ${year - 1}`;
-  $("period").textContent = `Showing ${label}, compared with ${pastLabel}. Choose "Whole year" to compare years, or a month to compare the same month last year.`;
+  $("period").textContent = `Showing ${label}, compared with ${pastLabel}. Click a month in the tables to see that month in all earlier years.`;
 
   renderKpis(cur, past, curC, pastC, idx);
   renderCharts(cur, past, curC, idx);
@@ -408,6 +408,13 @@ function buildCard(measure, cur, past, indexes) {
     );
     tr.addEventListener("click", () => setMonth(month === i ? null : i));
     tbody.append(tr);
+
+    // Clicked month: show the same month in every earlier year, under the clicked line
+    if (month === i) {
+      const years = historyYears();
+      for (const y of years) tbody.append(historyRow(measure.key, y, i));
+      if (years.length) tbody.append(historyAverageRow(measure.key, years, i));
+    }
   });
 
   const all = sumMonths(cur, measure.key, ALL_MONTHS);
@@ -434,6 +441,56 @@ function buildCard(measure, cur, past, indexes) {
 
   card.append(h, line, wrap);
   return card;
+}
+
+// Years before the selected year that have data, newest first
+function historyYears() {
+  return Object.keys(monthly)
+    .map(Number)
+    .filter((y) => y < year)
+    .sort((a, b) => b - a);
+}
+
+// One earlier year for the clicked month. "Past year" is the year before that one.
+function historyRow(key, y, i) {
+  const s = split(yearData(monthly, y)[i], key);
+  const p = split(yearData(monthly, y - 1)[i], key).total;
+  const c = change(s.total, p);
+  const tr = document.createElement("tr");
+  tr.className = "history";
+  tr.append(
+    cellText(`${MONTHS[i]} ${y}`),
+    cellText(fmt(s.mp)),
+    cellText(fmt(s.vp)),
+    cellText(fmt(s.total)),
+    cellText(fmt(p)),
+    changeCell(c.diff, true),
+    changeCell(c.pct, false)
+  );
+  return tr;
+}
+
+// Average of the earlier years for the clicked month
+function historyAverageRow(key, years, i) {
+  const values = years.map((y) => split(yearData(monthly, y)[i], key));
+  const n = values.length;
+  const avg = {
+    mp: values.reduce((a, v) => a + v.mp, 0) / n,
+    vp: values.reduce((a, v) => a + v.vp, 0) / n,
+    total: values.reduce((a, v) => a + v.total, 0) / n,
+  };
+  const tr = document.createElement("tr");
+  tr.className = "history avg";
+  tr.append(
+    cellText(`${MONTHS[i]} average (${years[years.length - 1]}–${years[0]})`),
+    cellText(fmt(avg.mp)),
+    cellText(fmt(avg.vp)),
+    cellText(fmt(avg.total)),
+    cellText(""),
+    cellText(""),
+    cellText("")
+  );
+  return tr;
 }
 
 function cellText(text) {
