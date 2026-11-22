@@ -1,4 +1,5 @@
-// Upload page for revenue: reads "Promet MP" and "Promet VP" and replaces the stored revenue rows.
+// Upload page for revenue: reads "Promet MP" and "Promet VP" and replaces the stored rows.
+// All columns are kept, so the MP and VP pages can show the uploaded data.
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 const $ = (id) => document.getElementById(id);
 
@@ -60,9 +61,9 @@ $("import-btn").addEventListener("click", async () => {
 
     const counts = [];
     for (const [sheet, dataset] of Object.entries(SHEETS)) {
-      const { rows, skipped } = sheetToRows(wb.Sheets[sheet], sheet, dataset, is1904);
+      const { headers, rows, skipped } = sheetToRows(wb.Sheets[sheet], sheet, dataset, is1904);
       setStatus(`Saving ${sheet} (${rows.length} rows)…`);
-      await replaceDataset(dataset, rows);
+      await replaceDataset(dataset, headers, rows);
       const years = rows.map((r) => Number(r[REVENUE_COLUMNS[dataset].date].slice(0, 4)));
       const span = years.length ? `${Math.min(...years)}–${Math.max(...years)}` : "no dates";
       counts.push(`${sheet} ${rows.length} rows, years ${span}${skipped ? `, ${skipped} rows without a date skipped` : ""}`);
@@ -75,7 +76,7 @@ $("import-btn").addEventListener("click", async () => {
   }
 });
 
-// Finds the header row (the workbook has a total line above it in Promet MP), then keeps only the needed columns.
+// Finds the header row (the workbook has a total line above it in Promet MP) and keeps every named column.
 function sheetToRows(ws, sheetName, dataset, is1904) {
   const cols = REVENUE_COLUMNS[dataset];
   const needed = [cols.date, cols.revenue, cols.vat, cols.profit];
@@ -90,34 +91,41 @@ function sheetToRows(ws, sheetName, dataset, is1904) {
   }
 
   const names = aoa[headerIndex].map((h) => (h == null ? "" : String(h).replace(/\s+/g, " ").trim()));
-  const at = Object.fromEntries(needed.map((n) => [n, names.indexOf(n)]));
+  const keep = names.map((name, i) => ({ name, i })).filter((c) => c.name);
+  const headers = keep.map((c) => c.name);
+  const dateIndex = names.indexOf(cols.date);
+
   const rows = [];
   let skipped = 0;
   for (const row of aoa.slice(headerIndex + 1)) {
-    const key = excelDateKey(row[at[cols.date]], is1904);
+    const raw = row[dateIndex];
+    const key = excelDateKey(raw, is1904);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) {
-      if (row[at[cols.date]] !== null && row[at[cols.date]] !== undefined && row[at[cols.date]] !== "") skipped++;
+      if (raw !== null && raw !== undefined && raw !== "") skipped++;
       continue;
     }
-    rows.push({
-      [cols.date]: key,
-      [cols.revenue]: numOrZero(row[at[cols.revenue]]),
-      [cols.vat]: numOrZero(row[at[cols.vat]]),
-      [cols.profit]: numOrZero(row[at[cols.profit]]),
-    });
+    const obj = {};
+    for (const c of keep) {
+      if (c.name === cols.date) {
+        obj[c.name] = key;
+      } else {
+        const v = row[c.i];
+        obj[c.name] = typeof v === "number" || typeof v === "string" ? v : null;
+      }
+    }
+    rows.push(obj);
   }
-  return { rows, skipped };
+  return { headers, rows, skipped };
 }
 
-function numOrZero(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-async function replaceDataset(dataset, rows) {
+// Stores the column order in a first row (row_no 0), because the database does not keep key order.
+async function replaceDataset(dataset, headers, rows) {
   const { error: delError } = await sb.from("revenue_rows").delete().eq("dataset", dataset);
   if (delError) throw delError;
-  const records = rows.map((data, i) => ({ dataset, row_no: i + 1, data }));
+  const records = [
+    { dataset, row_no: 0, data: { __headers: headers } },
+    ...rows.map((data, i) => ({ dataset, row_no: i + 1, data })),
+  ];
   for (let i = 0; i < records.length; i += 200) {
     const { error } = await sb.from("revenue_rows").insert(records.slice(i, i + 200));
     if (error) throw error;

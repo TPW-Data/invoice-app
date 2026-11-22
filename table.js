@@ -7,6 +7,8 @@ const TABLES = {
   salary: "Salary",
   out_of_mer: "Out of MER Racuni",
   uploaded: "Uploaded Invoices",
+  promet_mp: "MP",
+  promet_vp: "VP",
 };
 const UP_HEADER = [
   "Invoice Date", "Invoice Number", "Company Name", "Amount Net (Original)", "CUR",
@@ -57,6 +59,16 @@ async function fetchAll(build) {
 }
 
 async function loadRows() {
+  if (dataset === "promet_mp" || dataset === "promet_vp") {
+    // Revenue tabs: every column of the uploaded sheet, in the original order (saved in the first stored row)
+    const data = await fetchAll(() =>
+      sb.from("revenue_rows").select("data").eq("dataset", dataset).order("row_no")
+    );
+    const headerRow = data.find((r) => r.data && r.data.__headers);
+    const headers = headerRow ? headerRow.data.__headers : Object.values(REVENUE_COLUMNS[dataset]);
+    const rows = data.filter((r) => !(r.data && r.data.__headers)).map((r) => r.data);
+    return { headers, rows };
+  }
   if (dataset === "uploaded") {
     const inv = await fetchAll(() => sb.from("invoices").select("*").order("created_at"));
     return {
