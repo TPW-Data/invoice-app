@@ -1,9 +1,12 @@
-// Read-only management dashboard. Uses the same Supabase project and sign-in as the invoice app.
+// Monthly Situation dashboard. Same rules as the original Excel sheet:
+// - expenses are grouped by month and classification
+// - Salary comes from the Salary data (all rows), classification "Salary"
+// - Net = sum of the 7 classes; PDV = VAT of every row; Gross = Net + PDV
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-const RATES = [5, 13, 25];
 const $ = (id) => document.getElementById(id);
-const fmt = (n) => Number(n || 0).toLocaleString("hr-HR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-let all = [];
+const CLASSES = ["Primke", "Transport", "OPEX", "Salary", "Representation", "Marketing", "Investment"];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+let entries = [];
 let chart = null;
 
 // ---------- auth ----------
@@ -24,56 +27,96 @@ $("login-form").addEventListener("submit", async (e) => {
 });
 
 $("logout-btn").addEventListener("click", () => sb.auth.signOut());
-$("period").addEventListener("change", render);
+$("year").addEventListener("change", render);
 
 // ---------- data ----------
-function monthOf(r) {
-  return (r.invoice_date || r.created_at).slice(0, 7); // YYYY-MM
-}
-
-async function load() {
-  $("status").textContent = "Loading…";
-  const { data, error } = await sb
-    .from("invoices")
-    .select("*")
-    .order("created_at", { ascending: true })
-    .limit(5000);
-  if (error) {
-    $("status").textContent = error.message;
-    return;
-  }
-
-  all = data.map((r) => ({ ...r, month: monthOf(r), gross: Number(r.gross_total) || 0 }));
-
-  const months = [...new Set(all.map((r) => r.month))].sort().reverse();
-  const current = $("period").value;
-  $("period").replaceChildren(new Option("All time", "all"), ...months.map((m) => new Option(m, m)));
-  if ([...$("period").options].some((o) => o.value === current)) $("period").value = current;
-
-  renderMonthly();
-  render();
-  $("status").textContent = `Updated ${new Date().toLocaleString("hr-HR")} · ${all.length} invoices`;
-}
-
-function filtered() {
-  const p = $("period").value;
-  return p === "all" ? all : all.filter((r) => r.month === p);
-}
-
-function sum(rows, key) {
-  return rows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
-}
-
-function groupBy(rows, keyFn) {
-  const out = {};
-  for (const r of rows) {
-    const k = keyFn(r);
-    out[k] ??= { count: 0, gross: 0 };
-    out[k].count++;
-    out[k].gross += r.gross;
+// Supabase returns at most 1000 rows per request, so read in pages
+async function fetchAll(build) {
+  const out = [];
+  const size = 1000;
+  for (let from = 0; ; from += size) {
+    const { data, error } = await build().range(from, from + size - 1);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < size) break;
   }
   return out;
 }
+
+async function load() {
+  try {
+    $("status").textContent = "Loading…";
+    const [mer, out, sal, inv] = await Promise.all([
+      fetchAll(() => sb.from("mer_rows").select("data").eq("dataset", "mer_archive").order("row_no")),
+      fetchAll(() => sb.from("mer_rows").select("data").eq("dataset", "out_of_mer").order("row_no")),
+      fetchAll(() => sb.from("mer_rows").select("data").eq("dataset", "salary").order("row_no")),
+      fetchAll(() => sb.from("invoices").select("*").order("created_at")),
+    ]);
+
+    entries = [];
+    for (const { data: d } of mer) {
+      entries.push({ date: parseKey(d["Updated Date"]), cls: d["Invoice Classification"], net: num(d["Total Excl. VAT"]), vat: num(d["Total VAT"]) });
+    }
+    for (const { data: d } of out) {
+      entries.push({ date: parseKey(d["Invoice Date"]), cls: d["Invoice Classification"], net: num(d["Net Amount EUR"]), vat: num(d["VAT EUR"]) });
+    }
+    for (const { data: d } of sal) {
+      entries.push({ date: parseKey(d["Datum valute"]), cls: "Salary", net: num(d["Iznos isplate"]), vat: 0 });
+    }
+    for (const r of inv) {
+      entries.push({
+        date: parseKey(r.invoice_date || r.created_at),
+        cls: r.expense_class,
+        net: num(r.net_5) + num(r.net_13) + num(r.net_25),
+        vat: num(r.vat_5) + num(r.vat_13) + num(r.vat_25),
+      });
+    }
+    entries = entries.filter((e) => e.date);
+
+    const years = [...new Set(entries.map((e) => e.date.getFullYear()))].sort((a, b) => b - a);
+    if (!years.length) years.push(new Date().getFullYear());
+    const current = Number($("year").value) || years[0];
+    $("year").replaceChildren(...years.map((y) => new Option(String(y), String(y))));
+    $("year").value = String(years.includes(current) ? current : years[0]);
+
+    render();
+    $("status").textContent = `Updated ${new Date().toLocaleString("hr-HR")} · ${entries.length} rows`;
+  } catch (err) {
+    $("status").textContent = `Could not load data: ${err.message}`;
+  }
+}
+
+function parseKey(s) {
+  const m = String(s ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+}
+
+function num(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// ---------- calculation ----------
+function monthly(year) {
+  const grid = MONTHS.map(() => ({ cls: Object.fromEntries(CLASSES.map((c) => [c, 0])), net: 0, vat: 0, gross: 0 }));
+  let unmatched = 0;
+  for (const e of entries) {
+    if (e.date.getFullYear() !== year) continue;
+    const m = grid[e.date.getMonth()];
+    if (CLASSES.includes(e.cls)) {
+      m.cls[e.cls] += e.net;
+      m.net += e.net;
+    } else {
+      unmatched += e.net;
+    }
+    m.vat += e.vat;
+  }
+  grid.forEach((m) => (m.gross = m.net + m.vat));
+  return { grid, unmatched };
+}
+
+// ---------- rendering ----------
+const fmt = (n) => Number(n || 0).toLocaleString("hr-HR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function kpi(label, value) {
   const div = document.createElement("div");
@@ -86,64 +129,77 @@ function kpi(label, value) {
   return div;
 }
 
-function tr(cells) {
-  const row = document.createElement("tr");
-  for (const c of cells) {
-    const td = document.createElement("td");
-    td.textContent = c;
-    row.append(td);
-  }
-  return row;
+function cell(text, bold = false) {
+  const td = document.createElement("td");
+  td.textContent = text;
+  if (bold) td.style.fontWeight = "700";
+  return td;
 }
 
-// ---------- rendering ----------
 function render() {
-  const rows = filtered();
-  const gross = sum(rows, "gross");
-  const net = RATES.reduce((s, r) => s + sum(rows, `net_${r}`), 0);
-  const vat = RATES.reduce((s, r) => s + sum(rows, `vat_${r}`), 0);
-  const avg = rows.length ? gross / rows.length : 0;
+  const year = Number($("year").value);
+  const { grid, unmatched } = monthly(year);
+  const totals = { cls: Object.fromEntries(CLASSES.map((c) => [c, 0])), net: 0, vat: 0, gross: 0 };
+  for (const m of grid) {
+    for (const c of CLASSES) totals.cls[c] += m.cls[c];
+    totals.net += m.net;
+    totals.vat += m.vat;
+    totals.gross += m.gross;
+  }
 
+  // KPI cards
+  const topClass = CLASSES.reduce((best, c) => (totals.cls[c] > totals.cls[best] ? c : best), CLASSES[0]);
   $("kpis").replaceChildren(
-    kpi("Invoices", String(rows.length)),
-    kpi("Average invoice (EUR)", fmt(avg)),
-    kpi("Gross total (EUR)", fmt(gross)),
-    kpi("Net total (EUR)", fmt(net)),
-    kpi("VAT total (EUR)", fmt(vat)),
+    kpi("Net total (EUR)", fmt(totals.net)),
+    kpi("PDV total (EUR)", fmt(totals.vat)),
+    kpi("Gross total (EUR)", fmt(totals.gross)),
+    kpi("Largest class", totals.cls[topClass] ? `${topClass} · ${fmt(totals.cls[topClass])}` : "—")
   );
 
-  const byClass = groupBy(rows, (r) => r.expense_class || "Unclassified");
-  $("by-class").replaceChildren(
-    ...Object.entries(byClass)
-      .sort((a, b) => b[1].gross - a[1].gross)
-      .map(([name, g]) =>
-        tr([name, String(g.count), fmt(g.gross), gross ? `${((g.gross / gross) * 100).toFixed(1)} %` : "0 %"])
-      )
-  );
+  // Monthly table (same layout as the original Monthly Situation tab)
+  const head = document.createElement("tr");
+  for (const h of ["Month", ...CLASSES, "Net", "PDV", "Gross"]) {
+    const th = document.createElement("th");
+    th.textContent = h;
+    head.append(th);
+  }
+  $("thead").replaceChildren(head);
 
-  $("by-vat").replaceChildren(
-    ...RATES.map((r) => tr([`${r} %`, fmt(sum(rows, `net_${r}`)), fmt(sum(rows, `vat_${r}`))]))
-  );
+  const rows = grid.map((m, i) => {
+    const tr = document.createElement("tr");
+    tr.append(cell(MONTHS[i]));
+    for (const c of CLASSES) tr.append(cell(fmt(m.cls[c])));
+    tr.append(cell(fmt(m.net), true), cell(fmt(m.vat)), cell(fmt(m.gross), true));
+    return tr;
+  });
+  const tot = document.createElement("tr");
+  tot.className = "total";
+  tot.append(cell("TOTAL"));
+  for (const c of CLASSES) tot.append(cell(fmt(totals.cls[c])));
+  tot.append(cell(fmt(totals.net)), cell(fmt(totals.vat)), cell(fmt(totals.gross)));
+  $("tbody").replaceChildren(...rows, tot);
 
-  const bySupplier = groupBy(rows, (r) => r.company_name || "—");
-  $("top-suppliers").replaceChildren(
-    ...Object.entries(bySupplier)
-      .sort((a, b) => b[1].gross - a[1].gross)
-      .slice(0, 10)
-      .map(([name, g]) => tr([name, String(g.count), fmt(g.gross)]))
-  );
-}
+  $("note").textContent = unmatched
+    ? `Note: ${fmt(unmatched)} EUR of net amounts have a classification outside the 7 classes, so they are not in Net (same as the Excel sheet).`
+    : "";
 
-function renderMonthly() {
-  const byMonth = groupBy(all, (r) => r.month);
-  const keys = Object.keys(byMonth).sort();
+  // Chart: stacked by class
   if (chart) chart.destroy();
-  chart = new Chart($("chart-month"), {
+  const palette = ["#456733", "#8fb573", "#1f6feb", "#f0a202", "#c0392b", "#8e44ad", "#16a085"];
+  chart = new Chart($("chart"), {
     type: "bar",
     data: {
-      labels: keys,
-      datasets: [{ label: "Gross (EUR)", data: keys.map((k) => byMonth[k].gross), backgroundColor: "#1f6feb" }],
+      labels: MONTHS.map((m) => m.slice(0, 3)),
+      datasets: CLASSES.map((c, i) => ({
+        label: c,
+        data: grid.map((m) => m.cls[c]),
+        backgroundColor: palette[i],
+        stack: "expenses",
+      })),
     },
-    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    options: {
+      plugins: { legend: { position: "bottom" } },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+    },
   });
 }

@@ -9,24 +9,26 @@
   <link rel="manifest" href="manifest-management.json">
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <title>Plant Olive – Management</title>
+  <title>Plant Olive – Monthly Situation</title>
   <style>
     :root { font-family: system-ui, -apple-system, sans-serif; color: #111; }
     body { margin: 0; background: #f4f5f7; }
-    main { max-width: 720px; margin: 0 auto; padding: 16px; }
+    main { max-width: 1000px; margin: 0 auto; padding: 16px; }
     h1 { font-size: 1.3rem; margin: 8px 0 16px; }
     h2 { font-size: 1rem; margin: 0 0 10px; }
     .card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-    .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
     .kpi small { color: #666; display: block; font-size: .8rem; }
-    .kpi strong { font-size: 1.15rem; }
+    .kpi strong { font-size: 1.1rem; }
     label { display: block; font-size: .85rem; color: #444; margin-top: 10px; }
-    input, select { width: 100%; box-sizing: border-box; font-size: 16px; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-top: 4px; background: #fff; }
+    select, input { width: 100%; box-sizing: border-box; font-size: 16px; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-top: 4px; background: #fff; }
     .btn { display: block; width: 100%; text-align: center; font-size: 1.05rem; padding: 14px; border: 0; border-radius: 10px; background: #1f6feb; color: #fff; margin-top: 12px; cursor: pointer; box-sizing: border-box; }
     .btn.secondary { background: #555; }
-    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-    th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid #eee; }
-    th:not(:first-child), td:not(:first-child) { text-align: right; white-space: nowrap; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th, td { text-align: left; padding: 6px 6px; border-bottom: 1px solid #eee; white-space: nowrap; }
+    th:not(:first-child), td:not(:first-child) { text-align: right; }
+    tr.total td { font-weight: 700; border-top: 2px solid #456733; }
     .muted { color: #666; font-size: .85rem; }
     .topbar { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 8px 16px; padding-top: max(8px, env(safe-area-inset-top)); border-bottom: 1px solid #e5e7eb; }
     .logo { height: 40px; width: auto; display: block; }
@@ -34,6 +36,7 @@
     .menu { background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.15); display: flex; flex-direction: column; }
     .menu a { padding: 16px; color: #111; text-decoration: none; border-bottom: 1px solid #eee; font-size: 1.05rem; }
     .menu a.current { font-weight: 700; color: #456733; }
+    @media (max-width: 600px) { .kpis { grid-template-columns: 1fr 1fr; } }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -45,10 +48,11 @@
 <nav id="menu" class="menu" hidden>
   <a href="dashboard.html">Dashboard</a>
   <a href="index.html">Upload Invoice</a>
-  <a href="mer.html">MER File</a>
+  <a href="data.html">Data Tables</a>
 </nav>
+
 <main>
-  <h1>Plant Olive – Management</h1>
+  <h1>Monthly Situation</h1>
 
   <section id="login-view" hidden>
     <form id="login-form" class="card">
@@ -65,40 +69,27 @@
 
   <section id="app-view" hidden>
     <div class="card">
-      <label>Period
-        <select id="period"></select>
+      <label>Year
+        <select id="year"></select>
       </label>
     </div>
 
     <div class="card kpis" id="kpis"></div>
 
     <div class="card">
-      <h2>Gross total by month (EUR)</h2>
-      <canvas id="chart-month"></canvas>
+      <h2>Expenses by month and classification (EUR)</h2>
+      <canvas id="chart"></canvas>
     </div>
 
     <div class="card">
-      <h2>By invoice classification</h2>
-      <table>
-        <thead><tr><th>Class</th><th>Invoices</th><th>Gross</th><th>Share</th></tr></thead>
-        <tbody id="by-class"></tbody>
-      </table>
-    </div>
-
-    <div class="card">
-      <h2>VAT by rate (selected period)</h2>
-      <table>
-        <thead><tr><th>Rate</th><th>Net</th><th>VAT</th></tr></thead>
-        <tbody id="by-vat"></tbody>
-      </table>
-    </div>
-
-    <div class="card">
-      <h2>Top 10 suppliers (selected period)</h2>
-      <table>
-        <thead><tr><th>Company</th><th>Invoices</th><th>Gross</th></tr></thead>
-        <tbody id="top-suppliers"></tbody>
-      </table>
+      <h2>Monthly table</h2>
+      <div class="table-wrap">
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <p class="muted" id="note"></p>
     </div>
 
     <p class="muted" id="status"></p>
