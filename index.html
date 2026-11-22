@@ -46,10 +46,10 @@
 
   <section id="app-view" hidden>
     <div class="card">
-      <label class="btn">
-        📷 Photograph / choose invoice
-        <input type="file" id="photo" accept="image/*" capture="environment" class="visually-hidden">
-      </label>
+      <button class="btn" type="button" id="btn-photo">📷 Photo from phone or take photo</button>
+      <button class="btn" type="button" id="btn-doc">📄 Choose PDF or Word file</button>
+      <input type="file" id="photo" accept="image/*" class="visually-hidden">
+      <input type="file" id="doc" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="visually-hidden">
       <img id="preview" alt="Invoice preview" hidden>
       <p id="status" role="status"></p>
     </div>
@@ -57,6 +57,9 @@
     <form id="save-form" class="card">
       <label>Invoice number
         <input id="invoice_number" required>
+      </label>
+      <label>Invoice date
+        <input type="date" id="invoice_date">
       </label>
       <label>Company name
         <input id="company_name" required>
@@ -111,6 +114,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 </body>

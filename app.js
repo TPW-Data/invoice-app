@@ -4,7 +4,10 @@ const EXCEL_PATH = "exports/invoices.xlsx"; // the accumulated workbook, rewritt
 const RATES = [5, 13, 25];
 const $ = (id) => document.getElementById(id);
 const num = (id) => parseFloat($(id).value) || 0;
-let photoBlob = null;
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+let sourceBlob = null;  // the file to keep in Storage
+let fileType = "image/jpeg";
+let fileExt = "jpg";
 
 // ---------- setup ----------
 $("expense_class").replaceChildren(
@@ -30,20 +33,46 @@ $("login-form").addEventListener("submit", async (e) => {
 
 $("logout-btn").addEventListener("click", () => sb.auth.signOut());
 
-// ---------- photo -> AI extraction ----------
-$("photo").addEventListener("change", async (e) => {
-  const file = e.target.files[0];
+// ---------- invoice file (photo, PDF or Word) -> AI extraction ----------
+$("btn-photo").addEventListener("click", () => $("photo").click());
+$("btn-doc").addEventListener("click", () => $("doc").click());
+$("photo").addEventListener("change", (e) => handleFile(e.target.files[0]));
+$("doc").addEventListener("change", (e) => handleFile(e.target.files[0]));
+
+async function handleFile(file) {
   if (!file) return;
   try {
-    setStatus("Preparing photo…");
-    photoBlob = await shrinkImage(file, 1600, 0.8);
-    $("preview").src = URL.createObjectURL(photoBlob);
-    $("preview").hidden = false;
+    const name = file.name.toLowerCase();
+    $("preview").hidden = true;
+    setStatus("Preparing file…");
+
+    let payload;
+    if (file.type.startsWith("image/") || /\.(jpe?g|png|heic|heif|webp)$/.test(name)) {
+      sourceBlob = await shrinkImage(file, 1600, 0.8);
+      fileType = "image/jpeg";
+      fileExt = "jpg";
+      $("preview").src = URL.createObjectURL(sourceBlob);
+      $("preview").hidden = false;
+      payload = { fileBase64: await blobToBase64(sourceBlob), mediaType: "image/jpeg" };
+    } else if (name.endsWith(".pdf")) {
+      if (file.size > 4 * 1024 * 1024) throw new Error("PDF is larger than 4 MB – please use a smaller file.");
+      sourceBlob = file;
+      fileType = "application/pdf";
+      fileExt = "pdf";
+      payload = { fileBase64: await blobToBase64(file), mediaType: "application/pdf" };
+    } else if (name.endsWith(".docx")) {
+      sourceBlob = file;
+      fileType = DOCX_MIME;
+      fileExt = "docx";
+      const { value } = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+      payload = { text: value };
+    } else {
+      throw new Error("Unsupported file. Use a photo, a PDF, or a .docx file (for an old .doc file, save it as .docx or PDF first).");
+    }
 
     setStatus("Reading invoice…");
-    const imageBase64 = await blobToBase64(photoBlob);
     const { data, error } = await sb.functions.invoke("extract-invoice", {
-      body: { imageBase64, categories: CONFIG.EXPENSE_CATEGORIES },
+      body: { ...payload, categories: CONFIG.EXPENSE_CATEGORIES },
     });
     if (error || data?.error) throw new Error(data?.error || error.message);
 
@@ -52,10 +81,11 @@ $("photo").addEventListener("change", async (e) => {
   } catch (err) {
     setStatus(`Could not read invoice – enter the data manually. (${err.message})`, true);
   }
-});
+}
 
 function fillForm(d) {
   $("invoice_number").value = d.invoice_number ?? "";
+  $("invoice_date").value = toISODate(d.invoice_date);
   $("company_name").value = d.company_name ?? "";
   $("oib").value = String(d.oib ?? "").replace(/\D/g, "");
   $("gross_total").value = d.gross_total ?? "";
@@ -92,6 +122,14 @@ function validate() {
   return warnings.length === 0;
 }
 
+// Croatian invoices show dates as 22.11.2026. – convert to 2026-11-22 for the date box
+function toISODate(s) {
+  if (!s) return "";
+  const hr = String(s).match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/);
+  if (hr) return `${hr[3]}-${hr[2].padStart(2, "0")}-${hr[1].padStart(2, "0")}`;
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+}
+
 // ISO 7064 MOD 11,10 check digit used for Croatian OIB numbers
 function isValidOIB(oib) {
   if (!/^\d{11}$/.test(oib)) return false;
@@ -116,14 +154,15 @@ $("save-form").addEventListener("submit", async (e) => {
 
     // Source photo is kept in private Storage; the invoice row stores its path.
     let imagePath = null;
-    if (photoBlob) {
-      imagePath = `${user.id}/${Date.now()}.jpg`;
-      const { error } = await sb.storage.from(BUCKET).upload(imagePath, photoBlob, { contentType: "image/jpeg" });
+    if (sourceBlob) {
+      imagePath = `${user.id}/${Date.now()}.${fileExt}`;
+      const { error } = await sb.storage.from(BUCKET).upload(imagePath, sourceBlob, { contentType: fileType });
       if (error) throw error;
     }
 
     const row = {
       invoice_number: $("invoice_number").value.trim(),
+      invoice_date: $("invoice_date").value || null,
       company_name: $("company_name").value.trim(),
       oib: $("oib").value.trim(),
       net_5: num("net_5"), vat_5: num("vat_5"),
@@ -156,8 +195,9 @@ $("save-form").addEventListener("submit", async (e) => {
 
 function resetForm() {
   $("save-form").reset();
-  photoBlob = null;
+  sourceBlob = null;
   $("photo").value = "";
+  $("doc").value = "";
   $("preview").hidden = true;
   $("warnings").replaceChildren();
 }
@@ -210,12 +250,12 @@ async function buildWorkbookBlob() {
   if (error) throw error;
 
   const header = [
-    "Invoice number", "Company name", "OIB",
+    "Invoice number", "Invoice date", "Company name", "OIB",
     "Net 5%", "VAT 5%", "Net 13%", "VAT 13%", "Net 25%", "VAT 25%",
     "Gross total", "Expense classification", "Uploaded",
   ];
   const rows = data.map((r) => [
-    r.invoice_number, r.company_name, r.oib,
+    r.invoice_number, r.invoice_date ?? "", r.company_name, r.oib,
     Number(r.net_5), Number(r.vat_5),
     Number(r.net_13), Number(r.vat_13),
     Number(r.net_25), Number(r.vat_25),
@@ -223,7 +263,7 @@ async function buildWorkbookBlob() {
   ]);
 
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-  ws["!cols"] = header.map((_, i) => ({ wch: i === 1 ? 30 : i === 10 ? 22 : 14 }));
+  ws["!cols"] = header.map((_, i) => ({ wch: i === 2 ? 30 : i === 11 ? 22 : 14 }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Invoices");
   const bytes = XLSX.write(wb, { bookType: "xlsx", type: "array" });

@@ -5,6 +5,7 @@ create table if not exists public.invoices (
   created_at    timestamptz not null default now(),
   created_by    uuid not null default auth.uid() references auth.users (id),
   invoice_number text not null,
+  invoice_date  date,
   company_name  text not null,
   oib           char(11) not null check (oib ~ '^[0-9]{11}$'),
   net_5         numeric(12,2) not null default 0,

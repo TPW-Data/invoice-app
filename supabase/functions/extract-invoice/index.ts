@@ -13,10 +13,11 @@ const MODEL = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-haiku-5-5"; // cheapest
 
 function buildPrompt(categories: string[]): string {
   return [
-    "This is a photo of a Croatian invoice (racun).",
+    "This is a Croatian invoice (racun), given as a photo, a PDF, or extracted text.",
     "Extract the data and reply with ONLY a JSON object, no other text, in this shape:",
     "{",
     '  "invoice_number": string or null,',
+    '  "invoice_date": string or null (date the invoice was issued, format YYYY-MM-DD; Croatian dates look like 22.11.2026.),',
     '  "company_name": string or null (the seller / issuer of the invoice),',
     '  "oib": string or null (the seller\'s 11-digit OIB, digits only),',
     '  "vat_breakdown": [{"rate": 5 or 13 or 25, "net": number, "vat": number}] (one entry per VAT rate that appears),',
@@ -39,8 +40,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
-    const { imageBase64, categories } = await req.json();
-    if (!imageBase64) throw new Error("imageBase64 is required");
+    const { fileBase64, mediaType, text, categories } = await req.json();
+    if (!fileBase64 && !text) throw new Error("No file content received");
 
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
@@ -59,7 +60,11 @@ Deno.serve(async (req) => {
           {
             role: "user",
             content: [
-              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imageBase64 } },
+              ...(text
+                ? [{ type: "text", text: `Text of the invoice:\n${text}` }]
+                : mediaType === "application/pdf"
+                  ? [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }]
+                  : [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: fileBase64 } }]),
               { type: "text", text: buildPrompt(categories ?? []) },
             ],
           },
