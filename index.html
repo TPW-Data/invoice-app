@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Invoice Upload</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, sans-serif; color: #111; }
+    body { margin: 0; background: #f4f5f7; }
+    main { max-width: 560px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 1.3rem; margin: 8px 0 16px; }
+    h2 { font-size: 1.05rem; margin: 0; }
+    .card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    label { display: block; font-size: .85rem; color: #444; margin-top: 10px; }
+    input, select { width: 100%; box-sizing: border-box; font-size: 16px; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-top: 4px; background: #fff; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .btn { display: block; width: 100%; text-align: center; font-size: 1.05rem; padding: 14px; border: 0; border-radius: 10px; background: #1f6feb; color: #fff; margin-top: 12px; cursor: pointer; box-sizing: border-box; }
+    .btn.secondary { background: #555; }
+    .btn:disabled { opacity: .5; }
+    .btn.small { width: auto; display: inline-block; padding: 8px 12px; margin: 0; font-size: .9rem; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+    #preview { width: 100%; border-radius: 8px; margin-top: 12px; }
+    #status { min-height: 1.2em; font-size: .9rem; color: #333; margin: 10px 0 0; }
+    #status.error { color: #c00; }
+    #warnings { color: #b26a00; font-size: .9rem; padding-left: 18px; margin: 8px 0 0; }
+    .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .item { border-bottom: 1px solid #eee; padding: 10px 0; }
+    .item small { color: #666; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Invoice Upload</h1>
+
+  <section id="login-view" hidden>
+    <form id="login-form" class="card">
+      <label>Email
+        <input type="email" id="email" required autocomplete="email">
+      </label>
+      <button class="btn" type="submit">Send sign-in link</button>
+      <p id="login-msg" role="status"></p>
+    </form>
+  </section>
+
+  <section id="app-view" hidden>
+    <div class="card">
+      <label class="btn">
+        📷 Photograph / choose invoice
+        <input type="file" id="photo" accept="image/*" capture="environment" class="visually-hidden">
+      </label>
+      <img id="preview" alt="Invoice preview" hidden>
+      <p id="status" role="status"></p>
+    </div>
+
+    <form id="save-form" class="card">
+      <label>Invoice number
+        <input id="invoice_number" required>
+      </label>
+      <label>Company name
+        <input id="company_name" required>
+      </label>
+      <label>OIB
+        <input id="oib" inputmode="numeric" pattern="[0-9]{11}" maxlength="11" required>
+      </label>
+
+      <div class="grid">
+        <label>Net 5%
+          <input type="number" step="0.01" inputmode="decimal" id="net_5">
+        </label>
+        <label>VAT 5%
+          <input type="number" step="0.01" inputmode="decimal" id="vat_5">
+        </label>
+        <label>Net 13%
+          <input type="number" step="0.01" inputmode="decimal" id="net_13">
+        </label>
+        <label>VAT 13%
+          <input type="number" step="0.01" inputmode="decimal" id="vat_13">
+        </label>
+        <label>Net 25%
+          <input type="number" step="0.01" inputmode="decimal" id="net_25">
+        </label>
+        <label>VAT 25%
+          <input type="number" step="0.01" inputmode="decimal" id="vat_25">
+        </label>
+      </div>
+
+      <label>Gross total
+        <input type="number" step="0.01" inputmode="decimal" id="gross_total" required>
+      </label>
+      <label>Expense classification
+        <select id="expense_class" required></select>
+      </label>
+
+      <ul id="warnings"></ul>
+      <button class="btn" type="submit" id="save-btn">Save invoice</button>
+    </form>
+
+    <section class="card">
+      <div class="head">
+        <h2>Saved invoices</h2>
+        <button class="btn small" id="export-btn" type="button">Export Excel</button>
+      </div>
+      <div id="list"></div>
+    </section>
+
+    <button class="btn secondary" id="logout-btn" type="button">Sign out</button>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
