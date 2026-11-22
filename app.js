@@ -91,10 +91,22 @@ function fillForm(d) {
   $("oib").value = String(d.oib ?? "").replace(/\D/g, "");
   $("gross_total").value = d.gross_total ?? "";
   $("expense_class").value = d.expense_class ?? "";
+  const breakdown = d.vat_breakdown || [];
   for (const r of RATES) {
-    const row = (d.vat_breakdown || []).find((x) => Number(x.rate) === r) || {};
+    const row = breakdown.find((x) => Number(x.rate) === r) || {};
     $(`net_${r}`).value = row.net ?? "";
     $(`vat_${r}`).value = row.vat ?? "";
+  }
+
+  // No VAT on the invoice: the whole amount goes into the 25% net column
+  const hasVat = breakdown.some((x) => Number(x.vat) > 0);
+  if (!hasVat && d.gross_total != null) {
+    const net = breakdown.reduce((s, x) => s + (Number(x.net) || 0), 0) || Number(d.gross_total);
+    for (const r of RATES) {
+      $(`net_${r}`).value = "";
+      $(`vat_${r}`).value = "";
+    }
+    $("net_25").value = net.toFixed(2);
   }
   validate();
 }

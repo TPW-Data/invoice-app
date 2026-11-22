@@ -4,6 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Invoices">
+  <meta name="theme-color" content="#456733">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <title>Invoice Upload</title>
   <style>
     :root { font-family: system-ui, -apple-system, sans-serif; color: #111; }
@@ -27,10 +32,24 @@
     .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .item { border-bottom: 1px solid #eee; padding: 10px 0; }
     .item small { color: #666; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; background: #456733; color: #fff; padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top)); }
+    .brand { font-weight: 600; }
+    .menu-btn { background: none; border: 0; color: #fff; font-size: 1.6rem; line-height: 1; padding: 4px 8px; cursor: pointer; }
+    .menu { background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.15); display: flex; flex-direction: column; }
+    .menu a { padding: 16px; color: #111; text-decoration: none; border-bottom: 1px solid #eee; font-size: 1.05rem; }
+    .menu a.current { font-weight: 700; color: #456733; }
     [hidden] { display: none !important; }
   </style>
 </head>
 <body>
+<header class="topbar">
+  <span class="brand">Plant Olive</span>
+  <button id="menu-btn" class="menu-btn" type="button" aria-label="Menu" aria-expanded="false">☰</button>
+</header>
+<nav id="menu" class="menu" hidden>
+  <a href="dashboard.html">Dashboard</a>
+  <a href="index.html">Upload Invoice</a>
+</nav>
 <main>
   <h1>Invoice Upload</h1>
 
@@ -120,5 +139,6 @@
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
+<script src="nav.js"></script>
 </body>
 </html>

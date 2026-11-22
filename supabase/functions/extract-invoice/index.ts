@@ -74,12 +74,12 @@ Deno.serve(async (req) => {
     if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${await res.text()}`);
 
     const data = await res.json();
-    const text = (data.content ?? [])
+    const answer = (data.content ?? [])
       .filter((b: { type: string }) => b.type === "text")
       .map((b: { text: string }) => b.text)
       .join("");
 
-    const match = text.match(/\{[\s\S]*\}/);
+    const match = answer.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("Model did not return JSON");
 
     return json(JSON.parse(match[0]));
