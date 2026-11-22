@@ -6,6 +6,7 @@
     "dashboard.html": ["admin", "accounting", "management"],
     "table.html": ["admin", "accounting", "management"],
     "import.html": ["admin"],
+    "users.html": ["admin"],
   };
 
   const pageName = (url) => {
