@@ -17,8 +17,9 @@ const UP_HEADER = [
 ];
 
 const requested = new URLSearchParams(window.location.search).get("t");
-const dataset = Object.hasOwn(TABLES, requested) ? requested : "mer_archive";
-const tableTitle = TABLES[dataset];
+const known = Object.hasOwn(TABLES, requested);
+const dataset = known ? requested : null;
+const tableTitle = known ? TABLES[dataset] : "Unknown table";
 $("title").textContent = tableTitle;
 document.title = `Plant Olive – ${tableTitle}`;
 
@@ -103,6 +104,10 @@ async function loadRows() {
 }
 
 async function loadAndDraw() {
+  if (!known) {
+    setStatus(`Unknown table "${requested ?? ""}". Open it from the menu.`, true);
+    return;
+  }
   try {
     setStatus("Loading…");
     cache = await loadRows();
