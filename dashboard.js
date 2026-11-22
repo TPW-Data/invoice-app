@@ -13,7 +13,7 @@ let chart = null;
 sb.auth.onAuthStateChange((_event, session) => {
   $("login-view").hidden = !!session;
   $("app-view").hidden = !session;
-  if (session) load();
+  if (session) setTimeout(load, 0); // run after the sign-in step has finished
 });
 
 $("login-form").addEventListener("submit", async (e) => {
@@ -82,7 +82,9 @@ async function load() {
     render();
     $("status").textContent = `Updated ${new Date().toLocaleString("hr-HR")} · ${entries.length} rows`;
   } catch (err) {
-    $("status").textContent = `Could not load data: ${err.message}`;
+    const msg = err?.message || JSON.stringify(err);
+    $("status").textContent = `Could not load data: ${msg}`;
+    console.error("Dashboard load failed:", err);
   }
 }
 

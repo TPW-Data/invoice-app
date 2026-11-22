@@ -17,7 +17,7 @@ const UP_HEADER = [
 sb.auth.onAuthStateChange((_event, session) => {
   $("login-view").hidden = !!session;
   $("app-view").hidden = !session;
-  if (session) renderTable();
+  if (session) setTimeout(renderTable, 0); // run after the sign-in step has finished
 });
 
 $("login-form").addEventListener("submit", async (e) => {
