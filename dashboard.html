@@ -28,9 +28,9 @@
     th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid #eee; }
     th:not(:first-child), td:not(:first-child) { text-align: right; white-space: nowrap; }
     .muted { color: #666; font-size: .85rem; }
-    .topbar { display: flex; justify-content: space-between; align-items: center; background: #456733; color: #fff; padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top)); }
-    .brand { font-weight: 600; }
-    .menu-btn { background: none; border: 0; color: #fff; font-size: 1.6rem; line-height: 1; padding: 4px 8px; cursor: pointer; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 8px 16px; padding-top: max(8px, env(safe-area-inset-top)); border-bottom: 1px solid #e5e7eb; }
+    .logo { height: 40px; width: auto; display: block; }
+    .menu-btn { background: none; border: 0; color: #456733; font-size: 1.6rem; line-height: 1; padding: 4px 8px; cursor: pointer; }
     .menu { background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.15); display: flex; flex-direction: column; }
     .menu a { padding: 16px; color: #111; text-decoration: none; border-bottom: 1px solid #eee; font-size: 1.05rem; }
     .menu a.current { font-weight: 700; color: #456733; }
@@ -39,7 +39,7 @@
 </head>
 <body>
 <header class="topbar">
-  <span class="brand">Plant Olive</span>
+  <img src="icons/logo.png" alt="Plant Olive" class="logo">
   <button id="menu-btn" class="menu-btn" type="button" aria-label="Menu" aria-expanded="false">☰</button>
 </header>
 <nav id="menu" class="menu" hidden>
