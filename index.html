@@ -37,9 +37,12 @@
   <section id="login-view" hidden>
     <form id="login-form" class="card">
       <label>Email
-        <input type="email" id="email" required autocomplete="email">
+        <input type="email" id="email" required autocomplete="username">
       </label>
-      <button class="btn" type="submit">Send sign-in link</button>
+      <label>Password
+        <input type="password" id="password" required autocomplete="current-password">
+      </label>
+      <button class="btn" type="submit">Sign in</button>
       <p id="login-msg" role="status"></p>
     </form>
   </section>

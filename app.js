@@ -24,11 +24,12 @@ sb.auth.onAuthStateChange((_event, session) => {
 
 $("login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const { error } = await sb.auth.signInWithOtp({
+  const { error } = await sb.auth.signInWithPassword({
     email: $("email").value.trim(),
-    options: { emailRedirectTo: window.location.href.split("#")[0] },
+    password: $("password").value,
   });
-  $("login-msg").textContent = error ? error.message : "Check your email for the sign-in link.";
+  $("login-msg").textContent = error ? "Wrong email or password." : "";
+  if (!error) $("password").value = "";
 });
 
 $("logout-btn").addEventListener("click", () => sb.auth.signOut());
