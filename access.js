@@ -7,6 +7,8 @@
     "table.html": ["admin", "accounting", "management"],
     "import.html": ["admin"],
     "users.html": ["admin"],
+    "revenue.html": ["admin", "accounting", "management"],
+    "revenue-upload.html": ["admin", "accounting"],
   };
 
   const pageName = (url) => {
