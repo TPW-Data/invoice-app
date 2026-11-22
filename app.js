@@ -265,7 +265,7 @@ async function buildWorkbookBlob() {
   const header = [
     "Invoice number", "Invoice date", "Company name", "OIB",
     "Net 5%", "VAT 5%", "Net 13%", "VAT 13%", "Net 25%", "VAT 25%",
-    "Gross total", "Expense classification", "Uploaded",
+    "Gross total", "Invoice classification", "Uploaded",
   ];
   const rows = data.map((r) => [
     r.invoice_number, r.invoice_date ?? "", r.company_name, r.oib,

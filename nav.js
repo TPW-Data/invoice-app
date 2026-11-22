@@ -1,12 +1,14 @@
-// Shared menu for index.html and dashboard.html: opens/closes the menu and highlights the current page.
+// Shared menu for all pages: opens/closes the menu and highlights the current page (including table.html?t=...).
 (function () {
   const btn = document.getElementById("menu-btn");
   const menu = document.getElementById("menu");
   if (!btn || !menu) return;
 
-  const here = window.location.pathname.split("/").pop() || "index.html";
+  const normalise = (url) => (url.pathname.endsWith("/") ? url.pathname + "index.html" : url.pathname) + url.search;
+  const here = normalise(new URL(window.location.href));
   menu.querySelectorAll("a").forEach((a) => {
-    if (a.getAttribute("href") === here) {
+    const target = normalise(new URL(a.getAttribute("href"), window.location.href));
+    if (target === here) {
       a.classList.add("current");
       a.setAttribute("aria-current", "page");
     }
