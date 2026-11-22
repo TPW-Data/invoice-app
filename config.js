@@ -4,12 +4,12 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "sb_publishable_-VGEXODXremOrnSXm7JQrQ_uWSlxczI",
   // Expense classifications shown in the dropdown and suggested by the AI. Edit freely.
   EXPENSE_CATEGORIES: [
-    "Materials",
-    "Services",
-    "Fuel & transport",
-    "Phone & internet",
-    "Rent",
-    "Office supplies",
-    "Other",
+  "Primke",
+  "Transport",
+  "OPEX",
+  "Salary",
+  "Representation",
+  "Marketing",
+  "Investment",
   ],
 };
